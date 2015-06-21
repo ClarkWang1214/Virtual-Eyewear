@@ -1,0 +1,261 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red100\green56\blue32;\red196\green26\blue22;\red170\green13\blue145;
+\red92\green38\blue153;\red0\green116\blue0;\red28\green0\blue207;\red46\green13\blue110;\red63\green110\blue116;
+\red38\green71\blue75;\red2\green61\blue16;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\deftab529
+\pard\tx529\pardeftab529\pardirnatural
+
+\f0\fs22 \cf2 \CocoaLigature0 #include \cf3 <opencv2/objdetect/objdetect.hpp>\cf2 \
+#include \cf3 <opencv2/highgui/highgui.hpp>\cf2 \
+#include \cf3 <opencv2/imgproc/imgproc.hpp>\cf2 \
+\cf0 \
+\cf2 #include \cf3 <iostream>\cf2 \
+#include \cf3 <queue>\cf2 \
+#include \cf3 <stdio.h>\cf2 \
+#include \cf3 <math.h>\cf2 \
+\cf0 \
+\cf2 #include \cf3 "constants.h"\cf2 \
+#include \cf3 "findEyeCenter.h"\cf2 \
+#include \cf3 "findEyeCorner.h"\cf2 \
+#include \cf3 "helpers.h"\cf2 \
+\cf0 \
+\cf4 using\cf0  \cf4 namespace\cf0  \cf5 cv\cf0 ;\
+\cf6 // Constants\cf0 \
+\cf2 #define PI (\cf7 22\cf2 /\cf7 7.0\cf2 )\
+\cf0 \
+\cf6 // Function Headers\cf0 \
+\cf4 void\cf0  detectAndDisplay( \cf5 cv\cf0 ::\cf5 Mat\cf0  frame,\cf4 float\cf0  theta );\
+\
+\cf6 // Global variables\cf0 \
+\cf6 //-- Note, either copy these two files from opencv/data/haarscascades to your current folder, or change these locations\cf0 \
+\cf5 cv\cf0 ::\cf5 String\cf0  face_cascade_name = \cf3 "/Users/andrewekhalel/Downloads/opencv-2.4.10/data/haarcascades/haarcascade_frontalface_alt.xml"\cf0 ;\
+\cf5 cv\cf0 ::\cf5 CascadeClassifier\cf0  face_cascade;\
+\cf5 String\cf0  glassesPath = \cf3 "/Users/andrewekhalel/Pictures/g1.png"\cf0 ;\
+\cf5 cv\cf0 ::\cf5 Mat\cf0  glasses = \cf8 imread\cf0 (\cf9 glassesPath\cf0 );\
+\cf5 std\cf0 ::\cf5 string\cf0  main_window_name = \cf3 "Capture - Face detection"\cf0 ;\
+\cf6 //std::string face_window_name = "Capture - Face";\cf0 \
+\cf5 cv\cf0 ::\cf5 RNG\cf0  rng(\cf7 12345\cf0 );\
+\cf5 cv\cf0 ::\cf5 Mat\cf0  debugImage;\
+\cf5 cv\cf0 ::\cf5 Mat\cf0  skinCrCbHist = \cf5 cv\cf0 ::\cf5 Mat\cf0 ::\cf8 zeros\cf0 (\cf5 cv\cf0 ::\cf5 Size\cf0 (\cf7 256\cf0 , \cf7 256\cf0 ), \cf2 CV_8UC1\cf0 );\
+\cf5 cv\cf0 ::\cf5 Point\cf0  leftPupil;\
+\cf5 cv\cf0 ::\cf5 Point\cf0  rightPupil;\
+\
+\cf4 int\cf0  main( \cf4 int\cf0  argc, \cf4 const\cf0  \cf4 char\cf0 ** argv ) \{\
+    \cf5 CvCapture\cf0 * capture;\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  frame;\
+    \cf6 // Load the cascades\cf0 \
+    \cf4 if\cf0 ( !\cf9 face_cascade\cf0 .\cf8 load\cf0 ( \cf9 face_cascade_name\cf0  ) )\{ \cf8 printf\cf0 (\cf3 "--(!)Error loading face cascade, please change face_cascade_name in source code.\\n"\cf0 ); \cf4 return\cf0  -\cf7 1\cf0 ; \};\
+    \
+    \cf5 cv\cf0 ::\cf8 namedWindow\cf0 (\cf9 main_window_name\cf0 ,\cf8 CV_WINDOW_NORMAL\cf0 );\
+    \cf6 //cv::moveWindow(main_window_name, 400, 100);\cf0 \
+    \cf6 //cv::namedWindow(face_window_name,CV_WINDOW_NORMAL);\cf0 \
+    \cf6 //cv::moveWindow(face_window_name, 10, 100);\cf0 \
+    \cf6 //cv::namedWindow("Right Eye",CV_WINDOW_NORMAL);\cf0 \
+    \cf6 //cv::moveWindow("Right Eye", 10, 600);\cf0 \
+    \cf6 //cv::namedWindow("Left Eye",CV_WINDOW_NORMAL);\cf0 \
+    \cf6 //cv::moveWindow("Left Eye", 10, 800);\cf0 \
+    \cf6 //cv::namedWindow("aa",CV_WINDOW_NORMAL);\cf0 \
+    \cf6 //cv::moveWindow("aa", 10, 800);\cf0 \
+    \cf6 //cv::namedWindow("aaa",CV_WINDOW_NORMAL);\cf0 \
+    \cf6 //cv::moveWindow("aaa", 10, 800);\cf0 \
+    \
+    \cf10 createCornerKernels\cf0 ();\
+    \cf8 ellipse\cf0 (\cf9 skinCrCbHist\cf0 , \cf5 cv\cf0 ::\cf5 Point\cf0 (\cf7 113\cf0 , \cf7 155.6\cf0 ), \cf5 cv\cf0 ::\cf5 Size\cf0 (\cf7 23.4\cf0 , \cf7 15.2\cf0 ),\
+            \cf7 43.0\cf0 , \cf7 0.0\cf0 , \cf7 360.0\cf0 , \cf5 cv\cf0 ::\cf5 Scalar\cf0 (\cf7 255\cf0 , \cf7 255\cf0 , \cf7 255\cf0 ), -\cf7 1\cf0 );\
+    \
+    \cf6 // Read the video stream\cf0 \
+    capture = \cf2 cvCaptureFromCAM\cf0 ( -\cf7 1\cf0  );\
+    \cf4 if\cf0 ( capture ) \{\
+        \cf4 while\cf0 ( \cf4 true\cf0  ) \{\
+            frame = \cf8 cvQueryFrame\cf0 ( capture );\
+            \cf6 // mirror it\cf0 \
+            \cf5 cv\cf0 ::\cf8 flip\cf0 (frame, frame, \cf7 1\cf0 );\
+            frame.\cf8 copyTo\cf0 (\cf9 debugImage\cf0 );\
+            \
+            \cf6 // Apply the classifier to the frame\cf0 \
+            \cf4 if\cf0 ( !frame.\cf8 empty\cf0 () ) \{\
+                \cf4 float\cf0  fraction = \cf7 0.2\cf0 ;\
+                \cf4 for\cf0 (\cf4 float\cf0  theta = -\cf2 PI\cf0 *fraction;theta<=\cf2 PI\cf0 *fraction+\cf7 0.01\cf0 ;theta+=\cf2 PI\cf0 *fraction)\
+                \{\
+                    \cf5 cv\cf0 ::\cf5 Mat\cf0  dst;\
+                    \cf10 rotate\cf0 (frame,(\cf4 int\cf0 )((theta*\cf7 180\cf0 )/\cf2 PI\cf0 ),dst);\
+                    \cf10 detectAndDisplay\cf0 ( dst ,theta);\
+                \}\
+            \}\
+            \cf4 else\cf0  \{\
+                \cf8 printf\cf0 (\cf3 " --(!) No captured frame -- Break!"\cf0 );\
+                \cf4 break\cf0 ;\
+            \}\
+            \
+            \cf8 imshow\cf0 (\cf9 main_window_name\cf0 ,\cf9 debugImage\cf0 );\
+            \
+            \cf4 int\cf0  c = \cf5 cv\cf0 ::\cf8 waitKey\cf0 (\cf7 10\cf0 );\
+            \cf4 if\cf0 ( (\cf4 char\cf0 )c == \cf7 'c'\cf0  ) \{ \cf4 break\cf0 ; \}\
+            \cf4 if\cf0 ( (\cf4 char\cf0 )c == \cf7 'f'\cf0  ) \{\
+                \cf8 imwrite\cf0 (\cf3 "frame.png"\cf0 ,frame);\
+            \}\
+            \
+        \}\
+    \}\
+    \
+    \cf10 releaseCornerKernels\cf0 ();\
+    \
+    \cf4 return\cf0  \cf7 0\cf0 ;\
+\}\
+\
+\cf4 void\cf0  findEyes(\cf5 cv\cf0 ::\cf5 Mat\cf0  frame_gray, \cf5 cv\cf0 ::\cf5 Rect\cf0  face,\cf4 float\cf0  theta) \{\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  faceROI = frame_gray(\cf8 face\cf0 );\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  debugFace = faceROI;\
+    \
+    \cf4 if\cf0  (\cf9 kSmoothFaceImage\cf0 ) \{\
+        \cf4 double\cf0  sigma = \cf9 kSmoothFaceFactor\cf0  * face.\cf5 width\cf0 ;\
+        \cf8 GaussianBlur\cf0 ( faceROI, faceROI, \cf5 cv\cf0 ::\cf5 Size\cf0 ( \cf7 0\cf0 , \cf7 0\cf0  ), sigma);\
+    \}\
+    \cf6 //-- Find eye regions and draw them\cf0 \
+    \cf4 int\cf0  eye_region_width = face.\cf5 width\cf0  * (\cf9 kEyePercentWidth\cf0 /\cf7 100.0\cf0 );\
+    \cf4 int\cf0  eye_region_height = face.\cf5 width\cf0  * (\cf9 kEyePercentHeight\cf0 /\cf7 100.0\cf0 );\
+    \cf4 int\cf0  eye_region_top = face.\cf5 height\cf0  * (\cf9 kEyePercentTop\cf0 /\cf7 100.0\cf0 );\
+    \cf5 cv\cf0 ::\cf5 Rect\cf0  leftEyeRegion(face.\cf5 width\cf0 *(\cf9 kEyePercentSide\cf0 /\cf7 100.0\cf0 ),\
+                           eye_region_top,eye_region_width,eye_region_height);\
+    \cf5 cv\cf0 ::\cf5 Rect\cf0  rightEyeRegion(face.\cf5 width\cf0  - eye_region_width - face.\cf5 width\cf0 *(\cf9 kEyePercentSide\cf0 /\cf7 100.0\cf0 ),\
+                            eye_region_top,eye_region_width,eye_region_height);\
+    \
+    \cf6 //-- Find Eye Centers\cf0 \
+    \cf9 leftPupil\cf0  = \cf10 findEyeCenter\cf0 (faceROI,leftEyeRegion,\cf3 "Left Eye"\cf0 );\
+    \cf9 rightPupil\cf0  = \cf10 findEyeCenter\cf0 (faceROI,rightEyeRegion,\cf3 "Right Eye"\cf0 );\
+    \cf6 // get corner regions\cf0 \
+    \cf6 /*cv::Rect leftRightCornerRegion(leftEyeRegion);\
+    leftRightCornerRegion.width -= leftPupil.x;\
+    leftRightCornerRegion.x += leftPupil.x;\
+    leftRightCornerRegion.height /= 2;\
+    leftRightCornerRegion.y += leftRightCornerRegion.height / 2;\
+    cv::Rect leftLeftCornerRegion(leftEyeRegion);\
+    leftLeftCornerRegion.width = leftPupil.x;\
+    leftLeftCornerRegion.height /= 2;\
+    leftLeftCornerRegion.y += leftLeftCornerRegion.height / 2;\
+    cv::Rect rightLeftCornerRegion(rightEyeRegion);\
+    rightLeftCornerRegion.width = rightPupil.x;\
+    rightLeftCornerRegion.height /= 2;\
+    rightLeftCornerRegion.y += rightLeftCornerRegion.height / 2;\
+    cv::Rect rightRightCornerRegion(rightEyeRegion);\
+    rightRightCornerRegion.width -= rightPupil.x;\
+    rightRightCornerRegion.x += rightPupil.x;\
+    rightRightCornerRegion.height /= 2;\
+    rightRightCornerRegion.y += rightRightCornerRegion.height / 2;\
+    rectangle(debugFace,leftRightCornerRegion,200);\
+    rectangle(debugFace,leftLeftCornerRegion,200);\
+    rectangle(debugFace,rightLeftCornerRegion,200);\
+    rectangle(debugFace,rightRightCornerRegion,200);*/\cf0 \
+    \
+    \
+    \cf6 // change eye centers to face coordinates\cf0 \
+    \cf9 rightPupil\cf0 .\cf5 x\cf0  += rightEyeRegion.\cf5 x\cf0  + face.\cf5 x\cf0 ;\
+    \cf9 rightPupil\cf0 .\cf5 y\cf0  += rightEyeRegion.\cf5 y\cf0  + face.\cf5 y\cf0 ;\
+    \cf9 leftPupil\cf0 .\cf5 x\cf0  += leftEyeRegion.\cf5 x\cf0  + face.\cf5 x\cf0 ;\
+    \cf9 leftPupil\cf0 .\cf5 y\cf0  += leftEyeRegion.\cf5 y\cf0  + face.\cf5 y\cf0 ;\
+    \
+    \cf6 //reverse the rotation\cf0 \
+    \cf6 //x' = x*cos(alpha) - y*sin(alpha)\cf0 \
+    \cf6 //y' = x*sin(alpha) + y*cos(alpha)\cf0 \
+    \cf5 cv\cf0 ::\cf5 Point\cf0  ImageCenter (\cf9 debugImage\cf0 .\cf5 cols\cf0 /\cf7 2\cf0 ,\cf9 debugImage\cf0 .\cf5 rows\cf0 /\cf7 2\cf0 );\
+    \
+    \cf9 rightPupil\cf0 .\cf5 x\cf0 -=ImageCenter.\cf5 x\cf0 ;\
+    \cf9 rightPupil\cf0 .\cf5 y\cf0 -=ImageCenter.\cf5 y\cf0 ;\
+    \cf4 int\cf0  x = \cf9 rightPupil\cf0 .\cf5 x\cf0 ,y = \cf9 rightPupil\cf0 .\cf5 y\cf0 ;\
+    \cf9 rightPupil\cf0 .\cf5 x\cf0  = x*\cf8 cos\cf0 (theta) - y*\cf8 sin\cf0 (theta);\
+    \cf9 rightPupil\cf0 .\cf5 y\cf0  = x*\cf8 sin\cf0 (theta) + y*\cf8 cos\cf0 (theta);\
+    \cf9 rightPupil\cf0 .\cf5 x\cf0 +=ImageCenter.\cf5 x\cf0 ;\
+    \cf9 rightPupil\cf0 .\cf5 y\cf0 +=ImageCenter.\cf5 y\cf0 ;\
+    \
+    \cf9 leftPupil\cf0 .\cf5 x\cf0 -=ImageCenter.\cf5 x\cf0 ;\
+    \cf9 leftPupil\cf0 .\cf5 y\cf0 -=ImageCenter.\cf5 y\cf0 ;\
+    x = \cf9 leftPupil\cf0 .\cf5 x\cf0 ,y = \cf9 leftPupil\cf0 .\cf5 y\cf0 ;\
+    \cf9 leftPupil\cf0 .\cf5 x\cf0  = x*\cf8 cos\cf0 (theta) - y*\cf8 sin\cf0 (theta);\
+    \cf9 leftPupil\cf0 .\cf5 y\cf0  = x*\cf8 sin\cf0 (theta) + y*\cf8 cos\cf0 (theta);\
+    \cf9 leftPupil\cf0 .\cf5 x\cf0 +=ImageCenter.\cf5 x\cf0 ;\
+    \cf9 leftPupil\cf0 .\cf5 y\cf0 +=ImageCenter.\cf5 y\cf0 ;\
+\
+    \cf6 /*// draw eye centers\
+    circle(debugFace, rightPupil, 3, 1234);\
+    circle(debugFace, leftPupil, 3, 1234);\
+    \
+    //-- Find Eye Corners\
+    if (kEnableEyeCorner) \{\
+        cv::Point2f leftRightCorner = findEyeCorner(faceROI(leftRightCornerRegion), true, false);\
+        leftRightCorner.x += leftRightCornerRegion.x;\
+        leftRightCorner.y += leftRightCornerRegion.y;\
+        cv::Point2f leftLeftCorner = findEyeCorner(faceROI(leftLeftCornerRegion), true, true);\
+        leftLeftCorner.x += leftLeftCornerRegion.x;\
+        leftLeftCorner.y += leftLeftCornerRegion.y;\
+        cv::Point2f rightLeftCorner = findEyeCorner(faceROI(rightLeftCornerRegion), false, true);\
+        rightLeftCorner.x += rightLeftCornerRegion.x;\
+        rightLeftCorner.y += rightLeftCornerRegion.y;\
+        cv::Point2f rightRightCorner = findEyeCorner(faceROI(rightRightCornerRegion), false, false);\
+        rightRightCorner.x += rightRightCornerRegion.x;\
+        rightRightCorner.y += rightRightCornerRegion.y;\
+        circle(faceROI, leftRightCorner, 3, 200);\
+        circle(faceROI, leftLeftCorner, 3, 200);\
+        circle(faceROI, rightLeftCorner, 3, 200);\
+        circle(faceROI, rightRightCorner, 3, 200);\
+    \}\
+    \
+    //imshow(main_window_name, faceROI);\
+    //  cv::Rect roi( cv::Point( 0, 0 ), faceROI.size());\
+    //  cv::Mat destinationROI = debugImage( roi );\
+    //  faceROI.copyTo( destinationROI );*/\cf0 \
+\}\
+\
+\
+\cf5 cv\cf0 ::\cf5 Mat\cf0  findSkin (\cf5 cv\cf0 ::\cf5 Mat\cf0  &frame) \{\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  input;\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  output = \cf5 cv\cf0 ::\cf5 Mat\cf0 (frame.\cf5 rows\cf0 ,frame.\cf5 cols\cf0 , \cf2 CV_8U\cf0 );\
+    \
+    \cf8 cvtColor\cf0 (frame, input, \cf8 CV_BGR2YCrCb\cf0 );\
+    \
+    \cf4 for\cf0  (\cf4 int\cf0  y = \cf7 0\cf0 ; y < input.\cf5 rows\cf0 ; ++y) \{\
+        \cf4 const\cf0  \cf5 cv\cf0 ::\cf5 Vec3b\cf0  *Mr = input.\cf8 ptr\cf0 <\cf5 cv\cf0 ::\cf5 Vec3b\cf0 >(y);\
+        \cf6 //    uchar *Or = output.ptr<uchar>(y);\cf0 \
+        \cf5 cv\cf0 ::\cf5 Vec3b\cf0  *Or = frame.\cf8 ptr\cf0 <\cf5 cv\cf0 ::\cf5 Vec3b\cf0 >(y);\
+        \cf4 for\cf0  (\cf4 int\cf0  x = \cf7 0\cf0 ; x < input.\cf5 cols\cf0 ; ++x) \{\
+            \cf5 cv\cf0 ::\cf5 Vec3b\cf0  ycrcb = Mr[x];\
+            \cf6 //      Or[x] = (skinCrCbHist.at<uchar>(ycrcb[1], ycrcb[2]) > 0) ? 255 : 0;\cf0 \
+            \cf4 if\cf0 (\cf9 skinCrCbHist\cf0 .\cf8 at\cf0 <\cf5 uchar\cf0 >(ycrcb[\cf7 1\cf0 ], ycrcb[\cf7 2\cf0 ]) == \cf7 0\cf0 ) \{\
+                Or[x] = \cf5 cv\cf0 ::\cf5 Vec3b\cf0 (\cf7 0\cf0 ,\cf7 0\cf0 ,\cf7 0\cf0 );\
+            \}\
+        \}\
+    \}\
+    \cf4 return\cf0  output;\
+\}\
+\
+\cf6 /**\
+ * \cf11 @function\cf6  detectAndDisplay\
+ */\cf0 \
+\cf4 void\cf0  detectAndDisplay( \cf5 cv\cf0 ::\cf5 Mat\cf0  frame, \cf4 float\cf0  theta ) \{\
+    \cf5 std\cf0 ::\cf5 vector\cf0 <\cf5 cv\cf0 ::\cf5 Rect\cf0 > faces;\
+    \cf6 //cv::Mat frame_gray;\cf0 \
+    \
+    \cf5 std\cf0 ::\cf5 vector\cf0 <\cf5 cv\cf0 ::\cf5 Mat\cf0 > rgbChannels(\cf7 3\cf0 );\
+    \cf5 cv\cf0 ::\cf8 split\cf0 (frame, rgbChannels);\
+    \cf5 cv\cf0 ::\cf5 Mat\cf0  frame_gray = rgbChannels[\cf7 2\cf0 ];\
+    \
+    \cf6 //cvtColor( frame, frame_gray, CV_BGR2GRAY );\cf0 \
+    \cf6 //equalizeHist( frame_gray, frame_gray );\cf0 \
+    \cf6 //cv::pow(frame_gray, CV_64F, frame_gray);\cf0 \
+    \cf6 //-- Detect faces\cf0 \
+    \cf9 face_cascade\cf0 .\cf8 detectMultiScale\cf0 ( frame_gray, faces, \cf7 1.1\cf0 , \cf7 2\cf0 , \cf7 0\cf0 |\cf2 CV_HAAR_SCALE_IMAGE\cf0 |\cf2 CV_HAAR_FIND_BIGGEST_OBJECT\cf0 , \cf5 cv\cf0 ::\cf5 Size\cf0 (\cf7 150\cf0 , \cf7 150\cf0 ) );\
+    \cf6 //  findSkin(debugImage);\cf0 \
+    \
+    \cf6 /*for( int i = 0; i < faces.size(); i++ )\
+    \{\
+        rectangle(debugImage, faces[i], 1234);\
+    \}*/\cf0 \
+    \cf6 //-- Show what you got\cf0 \
+    \cf4 if\cf0  (faces.\cf8 size\cf0 () > \cf7 0\cf0 ) \{\
+        \cf10 findEyes\cf0 (frame_gray, faces[\cf7 0\cf0 ],theta);\
+        \cf6 //line(debugImage,leftPupil,rightPupil,255,5);\cf0 \
+        \cf8 addWeighted\cf0 (\cf9 debugImage\cf0 , \cf7 0.0\cf0 ,\cf9 glasses\cf0  , \cf7 1.0\cf0 , \cf7 0.0\cf0 , \cf9 debugImage\cf0 );\
+    \}\
+\}\
+}
